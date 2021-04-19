@@ -1,0 +1,681 @@
+#!/usr/bin/env bash
+
+bindir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+etcdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -n "${SLACK_CLI_TOKEN}" ]; then
+  token="${SLACK_CLI_TOKEN}"
+elif [ -r "${etcdir}/.slack" ] && [ -f "${etcdir}/.slack" ]; then
+  token=$(sed -n '1p' < "${etcdir}/.slack")
+elif [ -r "${HOME}/.slack" ] && [ -f "${HOME}/.slack" ]; then
+  token=$(sed -n '1p' < "${HOME}/.slack")
+elif [ -r "/etc/.slack" ] && [ -f "/etc/.slack" ]; then
+  token=$(sed -n '1p' < "/etc/.slack")
+fi
+
+# COMMAND PARSING #################################################################################
+cmd="${1}" ; shift
+
+# SUBCOMMAND PARSING ##############################################################################
+case "${cmd}${1}" in
+  chatdelete|chatsend|chatupdate|\
+  filedelete|fileinfo|filelist|fileupload|\
+  presenceactive|presenceaway|\
+  reminderadd|remindercomplete|reminderdelete|reminderinfo|reminderlist| \
+  snoozeend|snoozeinfo|snoozestart|\
+  statusclear|statusedit)
+    sub=${1} ; shift
+  ;;
+esac
+
+# PIPE FRIENDLINESS ###############################################################################
+case "${cmd}${sub}" in
+  chatsend|chatupdate|fileupload) [ -p /dev/stdin ] && stdin=$(cat <&0) ;;
+esac
+
+# ARGUMENT AND OPTION PARSING #####################################################################
+while (( "$#" )); do
+  case "${1}" in
+    --actions=*) actions=${1/--actions=/''} ; shift ;;
+    --actions*|-a*) actions=${2} ; shift ; shift ;;
+    --author-icon=*) authoricon=${1/--author-icon=/''} ; shift ;;
+    --author-icon*|-ai*) authoricon=${2} ; shift ; shift ;;
+    --author-link=*) authorlink=${1/--author-link=/''} ; shift ;;
+    --author-link*|-al*) titlelink=${2} ; shift ; shift ;;
+    --author=*) author=${1/--author=/''} ; shift ;;
+    --author*|-at*) author=${2} ; shift ; shift ;;
+    --channels=*) channels=${1/--channels=/''} ; shift ;;
+    --channels*|-chs*) channels=${2} ; shift ; shift ;;
+    --channel=*) channel=${1/--channel=/''} ; shift ;;
+    --channel*|-ch*) channel=${2} ; shift ; shift ;;
+    --color=*) color=${1/--color=/''} ; shift ;;
+    --color*|-cl*) color=${2} ; shift ; shift ;;
+    --compact|-cp) compact='-c' ; shift ;;
+    --comment=*) comment=${1/--comment=/''} ; shift ;;
+    --comment*|-cm*) comment=${2} ; shift ; shift ;;
+    --count=*) count=${1/--count=/''} ; shift ;;
+    --count|-cn*) count=${2} ; shift ; shift ;;
+    --emoji=*) emoji=${1/--emoji=/''} ; shift ;;
+    --emoji*|-em*) emoji=${2} ; shift ; shift ;;
+    --fields=*) fields=${1/--fields=/''} ; shift ;;
+    --fields*|-flds*) fields=${2} ; shift ; shift ;;
+    --filename=*) filename=${1/--filename=/''} ; shift ;;
+    --filename*|-fln*) filename=${2} ; shift ; shift ;;
+    --filetype=*) filetype=${1/--filetype=/''} ; shift ;;
+    --filetype*|-flt*) filetype=${2} ; shift ; shift ;;
+    --file=*) file=${1/--file=/''} ; shift ;;
+    --file*|-fl*) file=${2} ; shift ; shift ;;
+    --filter=*) filter=${1/--filter=/''} ; shift ;;
+    --filter*|-f*) filter=${2} ; shift ; shift ;;
+    --footer-icon=*) footericon=${1/--footer-icon=/''} ; shift ;;
+    --footer-icon*|-fi*) footericon=${2} ; shift ; shift ;;
+    --footer=*) footer=${1/--footer=/''} ; shift ;;
+    --footer*|-ft*) footer=${2} ; shift ; shift ;;
+    --image=*) image=${1/--image-url=/''} ; shift ;;
+    --image*|-im*) image=${2} ; shift ; shift ;;
+    --monochrome|-m) monochrome='-M' ; shift ;;
+    --minutes=*) minutes=${1/--minutes=/''} ; shift ;;
+    --minutes*|-mn*) minutes=${2} ; shift ; shift ;;
+    --page=*) page=${1/--page=/''} ; shift ;;
+    --page|-pg*) page=${2} ; shift ; shift ;;
+    --pretext=*) pretext=${1/--pretext=/''} ; shift ;;
+    --pretext*|-pt*) pretext=${2} ; shift ; shift ;;
+    --reminder=*) reminder=${1/--reminder=/''} ; shift ;;
+    --reminder|-rm*) reminder=${2} ; shift ; shift ;;
+    --text=*) text=${1/--text=/''} ; shift ;;
+    --text*|-tx*) text=${2} ; shift ; shift ;;
+    --thumbnail=*) thumbnail=${1/--thumbnail=/''} ; shift ;;
+    --thumbnail*|-th*) thumbnail=${2} ; shift ; shift ;;
+    --time=*) _time=${1/--time=/''} ; shift ;;
+    --time|-tm*) _time=${2} ; shift ; shift ;;
+    --timestamp-from=*) timestampfrom=${1/--timestampfrom=/''} ; shift ;;
+    --timestamp-from|-tf*) timestampfrom=${2} ; shift ; shift ;;
+    --timestamp-to=*) timestampto=${1/--timestampto=/''} ; shift ;;
+    --timestamp-to|-tt*) timestampto=${2} ; shift ; shift ;;
+    --timestamp=*) timestamp=${1/--timestamp=/''} ; shift ;;
+    --timestamp*|-ts*) timestamp=${2} ; shift ; shift ;;
+    --title-link=*) titlelink=${1/--title-link=/''} ; shift ;;
+    --title-link*|-tl*) titlelink=${2} ; shift ; shift ;;
+    --title=*) title=${1/--title=/''} ; shift ;;
+    --title*|-ti*) title=${2} ; shift ; shift ;;
+    --token=*) token=${1/--token=/''} ; shift ;;
+    --token|-tk*) token=${2} ; shift ; shift ;;
+    --trace|-x) trace='set -x' ; shift ;;
+    --types=*) types=${1/--types=/''} ; shift ;;
+    --types|-ty*) types=${2} ; shift ; shift ;;
+    --user=*) user=${1/--user=/''} ; shift ;;
+    --user|-ur*) user=${2} ; shift ; shift ;;
+    *)
+      case "${cmd}${sub}" in
+        chatdelete)
+          [ -n "${1}" ] && [ -n "${timestamp}" ] && [ -z "${channel}" ] && channel=${1}
+          [ -n "${1}" ] && [ -z "${timestamp}" ] && timestamp=${1}
+        ;;
+        chatsend)
+          [ -n "${1}" ] && [ -n "${text}" ] && [ -z "${channel}" ] && channel=${1}
+          [ -n "${1}" ] && [ -z "${text}" ] && text=${1}
+        ;;
+        chatupdate)
+          [ -n "${1}" ] && [ -n "${text}" ] && [ -n "${timestamp}" ] && [ -z "${channel}" ] && channel=${1}
+          [ -n "${1}" ] && [ -n "${text}" ] && [ -z "${timestamp}" ] && timestamp=${1}
+          [ -n "${1}" ] && [ -z "${text}" ] && text=${1}
+        ;;
+        filedelete|fileinfo)
+          [ -n "${1}" ] && [ -z "${file}" ] && file=${1}
+        ;;
+        fileupload)
+          [ -n "${1}" ] && [ -n "${file}" ] && [ -z "${channels}" ] && channels=${1}
+          [ -n "${1}" ] && [ -z "${file}" ] && file=${1}
+        ;;
+        snoozeinfo)
+          [ -n "${1}" ] && [ -z "${user}" ] && user=${1}
+        ;;
+        snoozestart)
+          [ -n "${1}" ] && [ -z "${minutes}" ] && minutes=${1}
+        ;;
+        statusedit)
+          [ -n "${1}" ] && [ -n "${text}" ] && [ -z "${emoji}" ] && emoji=${1}
+          [ -n "${1}" ] && [ -z "${text}" ] && text=${1}
+        ;;
+        reminderadd)
+          [ -n "${1}" ] && [ -n "${text}" ] && [ -z "${_time}" ] && _time=${1}
+          [ -n "${1}" ] && [ -z "${text}" ] && text=${1}
+        ;;
+        remindercomplete|reminderdelete|reminderinfo)
+          [ -n "${1}" ] && [ -z "${reminder}" ] && reminder=${1}
+        ;;
+      esac
+      shift
+    ;;
+  esac
+done
+
+# TRACING #########################################################################################
+${trace}
+
+# ARGUMENT AND OPTION PROMPTING ###################################################################
+case "${cmd}${sub}" in
+  chatdelete)
+    [ -z "${channel}" ] && read -e -p 'Enter channel (e.g. #general): ' channel
+    [ -z "${timestamp}" ] && read -e -p 'Enter timestamp (e.g. 1405894322.002768): ' timestamp
+  ;;
+  chatsend)
+    [ -z "${channel}" ] && [ -z "${text}" ] && prompt='true'
+    [ -n "${prompt}" ] && [ -z "${actions}" ] && read -e -p 'Enter actions (e.g. {"type": “button", "style": "primary", "text": "my text", "url": "http://example.com"}, ...): ' actions
+    [ -n "${prompt}" ] && [ -z "${author}" ] && read -e -p 'Enter author name (e.g. slackbot): ' author
+    [ -n "${prompt}" ] && [ -z "${authoricon}" ] && read -e -p 'Enter author icon (e.g. a URL): ' authoricon
+    [ -n "${prompt}" ] && [ -z "${authorlink}" ] && read -e -p 'Enter author link (e.g. a URL): ' authorlink
+    [ -z "${channel}" ] && read -e -p 'Enter channel (e.g. #general): ' channel
+    [ -n "${prompt}" ] && [ -z "${color}" ] && read -e -p 'Enter color (e.g. good): ' color
+    [ -n "${prompt}" ] && [ -z "${fields}" ] && read -e -p 'Enter fields (e.g. {"title": "My Field Title", "value": "My field value", "short": true}, ...): ' fields
+    [ -n "${prompt}" ] && [ -z "${footer}" ] && read -e -p 'Enter footer (e.g. Hello footer!): ' footer
+    [ -n "${prompt}" ] && [ -z "${footericon}" ] && read -e -p 'Enter footer icon (e.g. a URL): ' footericon
+    [ -n "${prompt}" ] && [ -z "${image}" ] && read -e -p 'Enter image (e.g. a URL): ' image
+    [ -n "${prompt}" ] && [ -z "${pretext}" ] && read -e -p 'Enter pretext (e.g. Hello pretext!): ' pretext
+    [ -z "${text}" ] && read -e -p 'Enter text (e.g. Hello text!): ' text
+    [ -n "${prompt}" ] && [ -z "${thumbnail}" ] && read -e -p 'Enter thumbnail (e.g. a URL): ' thumbnail
+    [ -n "${prompt}" ] && [ -z "${_time}" ] && read -e -p 'Enter time (e.g. 123456789): ' _time
+    [ -n "${prompt}" ] && [ -z "${title}" ] && read -e -p 'Enter title (e.g. Hello title!): ' title
+    [ -n "${prompt}" ] && [ -z "${titlelink}" ] && read -e -p 'Enter title link (e.g. a URL): ' titlelink
+  ;;
+  chatupdate)
+    [ -z "${text}" ] && read -e -p 'Enter text (e.g. Hello World!): ' text
+    [ -z "${timestamp}" ] && read -e -p 'Enter timestamp (e.g. 1405894322.002768): ' timestamp
+    [ -z "${channel}" ] && read -e -p 'Enter channel (e.g. #general): ' channel
+  ;;
+  filedelete)
+    [ -z "${file}" ] && read -e -p 'Enter file (e.g. F2147483862): ' file
+  ;;
+  fileinfo)
+    [ -z "${file}" ] && read -e -p 'Enter file (e.g. F2147483862): ' file
+  ;;
+  fileupload)
+    [ -z "${file}" ] && read -e -p 'Enter file (e.g. file.log): ' file
+    [ -z "${channels}" ] && read -e -p 'Enter channels (e.g. #general,C1234567890): ' channels
+  ;;
+  init)
+    if [ -n "${SLACK_CLI_TOKEN}" ]; then
+      _token="${SLACK_CLI_TOKEN}"
+    elif [ -r "${etcdir}/.slack" ] && [ -f "${etcdir}/.slack" ]; then
+      _token=$(sed -n '1p' < "${etcdir}/.slack")
+    fi
+
+    if [ -z "${token}" ] || [ "${token}" == "${_token}" ]; then
+      read -e -p 'Enter Slack API token: ' token
+    fi
+  ;;
+  reminderadd)
+    [ -z "${text}" ] && read -e -p 'Enter text (e.g. lunch): ' text
+    [ -z "${_time}" ] && read -e -p 'Enter time (e.g. 123456789): ' _time
+  ;;
+  remindercomplete|reminderdelete|reminderinfo)
+    [ -z "${reminder}" ] && read -e -p 'Enter reminder (e.g. RmCT7QGVBF): ' reminder
+  ;;
+  snoozestart)
+    [ -z "${minutes}" ] && read -e -p 'Enter minutes (e.g. 60): ' minutes
+  ;;
+  statusedit)
+    [ -z "${text}" ] && read -e -p 'Enter text (e.g. lunch): ' text
+    [ -z "${emoji}" ] && read -e -p 'Enter emoji (e.g. :hamburger:): ' emoji
+  ;;
+esac
+
+# COMMAND UTILITY FUNCTIONS #######################################################################
+function attachify() {
+  [ -n "${actions}" ] && local _actions=", \"actions\": [${actions}]"
+  [ -n "${author}" ] && local _author=", \"author_name\": \"${author}\""
+  [ -n "${authoricon}" ] && local _authoricon=", \"author_icon\": \"${authoricon}\""
+  [ -n "${authorlink}" ] && local _authorlink=", \"author_link\": \"${authorlink}\""
+  [ -n "${color}" ] && local _color=", \"color\": \"${color}\""
+  [ -n "${fields}" ] && local _fields=", \"fields\": [${fields}]"
+  [ -n "${footer}" ] && local _footer=", \"footer\": \"${footer}\""
+  [ -n "${footericon}" ] && local _footericon=", \"footer_icon\": \"${footericon}\""
+  [ -n "${image}" ] && local _image=", \"image_url\": \"${image}\""
+  [ -n "${pretext}" ] && local _pretext=", \"pretext\": \"${pretext}\""
+  [ -n "${thumbnail}" ] && local _thumbnail=", \"thumb_url\": \"${thumbnail}\""
+  [ -n "${_time}" ] && local __time=", \"ts\": \"${_time}\""
+  [ -n "${title}" ] && local _title=", \"title\": \"${title}\""
+  [ -n "${titlelink}" ] && local _titlelink=", \"title_link\": \"${titlelink}\""
+  local _json="${_author}${_authoricon}${_authorlink}${_color}${_footer}${_footericon}${_image}${_pretext}${_thumbnail}${__time}${_title}${_titlelink}${_fields}${_actions}"
+  [ -z "${_json}" ] && local _attachments="[{\"mrkdwn_in\": [\"pretext\"], \"fallback\": \"${text}\", \"pretext\": \"${text}\"}]"
+  [ -n "${_json}" ] && local _attachments="[{\"mrkdwn_in\": [\"fields\", \"pretext\", \"text\"], \"fallback\": \"${text}\", \"text\": \"${text}\"${_json}}]"
+
+  echo "${_attachments}"
+}
+
+function jqify() {
+  case "$(echo ${1} | jq -r '.ok')" in
+    true) echo ${1} | jq -r ${compact} ${monochrome} "${filter:=.}" ;;
+    *) echo ${1} | jq -r ${compact} ${monochrome} "${filter:=.}" ; return 1 ;;
+  esac
+}
+
+function lchannel() {
+  case "${channel}" in
+    @*)
+      local _user=$(\
+        curl -s -X POST https://slack.com/api/users.list --data-urlencode "token=${token}" 2>&1 | \
+        jq -r ".members | map(select(.name == \"${channel/@/}\" or .profile.display_name == \"${channel/@/}\")) | .[0].id")
+      local _channel=$(\
+        curl -s -X POST https://slack.com/api/im.list --data-urlencode "token=${token}" 2>&1 | \
+        jq -r ".ims | map(select(.user == \"${_user}\")) | .[].id")
+
+      echo ${_channel}
+    ;;
+    *) echo ${channel} ;;
+  esac
+}
+
+function luser() {
+  case "${user}" in
+    @*)
+      local _user=$(\
+        curl -s -X POST https://slack.com/api/users.list --data-urlencode "token=${token}" 2>&1 | \
+        jq -r ".members | map(select(.name == \"${user/@/}\" or .profile.display_name == \"${user/@/}\")) | .[0].id")
+
+      echo ${_user}
+    ;;
+    *) echo ${user} ;;
+  esac
+}
+
+# COMMAND FUNCTIONS ###############################################################################
+function chatdelete() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/chat.delete \
+      --data-urlencode "as_user=true" \
+      --data-urlencode "channel=$(lchannel)" \
+      --data-urlencode "ts=${timestamp}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function chatsend() {
+  [ -n "${stdin}" ] && [ -z "${text}" ] && text=\`\`\`${stdin//$'\n'/'\n'}\`\`\`
+
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/chat.postMessage \
+      --data-urlencode "as_user=true" \
+      --data-urlencode "attachments=$(attachify)" \
+      --data-urlencode "channel=$(lchannel)" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function chatupdate() {
+  [ -n "${stdin}" ] && [ -z "${text}" ] && text=\`\`\`${stdin//$'\n'/'\n'}\`\`\`
+
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/chat.update \
+      --data-urlencode "as_user=true" \
+      --data-urlencode "attachments=$(attachify)" \
+      --data-urlencode "channel=$(lchannel)" \
+      --data-urlencode "ts=${timestamp}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function help() {
+  local a=(${0//\// })
+  local bin=${a[${#a[@]}-1]}
+
+  echo 'Usage:'
+  echo "  ${bin} chat delete [<timestamp> [channel]]"
+  echo '    [--channel|-ch <channel>] [--compact|-c] [--filter|-f <filter>] [--monochrome|-m]'
+  echo '    [--timestamp|-ts <timestamp>] [--trace|-x]'
+  echo
+  echo "  ${bin} chat send [<text> [channel]]"
+  echo '    [--author|-at <author>] [--author-icon|-ai <author-icon-url>]'
+  echo '    [--author-link|-al <author-link>] [--channel|-ch <channel>] [--color|-cl <color>]'
+  echo '    [--compact|-cp] [--fields|-flds <fields>] [--filter|-f <filter>] [--footer|-ft <footer>]'
+  echo '    [--footer-icon|-fi <footer-icon-url>] [--image|-im <image-url>] [--monochrome|-m]'
+  echo '    [--pretext|-pt <pretext>] [--text|-tx <text>] [--thumbnail|-th <thumbnail-url>]'
+  echo '    [--time|-tm <time>] [--title|-ti <title>] [--title-link|-tl <title-link>]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} chat update [<text> [<timestamp> [channel]]]"
+  echo '    [--author|-at <author>] [--author-icon|-ai <author-icon-url>]'
+  echo '    [--author-link|-al <author-link>] [--channel|-ch <channel>] [--color|-cl <color>]'
+  echo '    [--compact|-cp] [--fields|flds <fields>] [--filter|-f <filter>] [--footer|-ft <footer>]'
+  echo '    [--footer-icon|-fi <footer-icon-url>] [--image|-im <image-url>] [--monochrome|-m]'
+  echo '    [--pretext|-pt <pretext>] [--text|-tx <text>] [--thumbnail|-th <thumbnail-url>]'
+  echo '    [--time|-tm <time>] [--timestamp|-ts <timestamp>] [--title|-ti <title>]'
+  echo '    [--title-link|-tl <title-link>] [--trace|-x]'
+  echo
+  echo "  ${bin} init"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--token|-tk <token>]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} file delete [file]"
+  echo '    [--compact|-c] [--file|-fl <file>] [--filter|-f <filter>] [--monochrome|-m]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} file info [file]"
+  echo '    [--count|-cn <count>] [--compact|-c] [--file|-fl <file>] [--filter|-f <filter>]'
+  echo '    [--monochrome|-m] [--page|-pg <page>] [--trace|-x]'
+  echo
+  echo "  ${bin} file list"
+  echo '    [--channel|-ch <channel>] [--count|-cn <count>] [--compact|-c] [--filter|-f <filter>]'
+  echo '    [--monochrome|-m] [--page|-pg <page>] [--timestamp-from|-tf <timetamp>]'
+  echo '    [--timestamp-to|-tt <timestamp>] [--trace|-x] [--types|-ty <types>]'
+  echo '    [--user|-ur <user>]'
+  echo
+  echo "  ${bin} file upload [<file> [channels]]"
+  echo '    [--channels|-chs <channels>] [--comment|-cm <comment>] [--compact|-c]'
+  echo '    [--file|fl <file>] [--filename|-fn <filename>] [--filetype|-ft <filetype>]'
+  echo '    [--filter|-f <filter>] [--monochrome|-m] [--title|-ti <title>] [--trace|-x]'
+  echo
+  echo "  ${bin} presence active"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo "  ${bin} presence away"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo "  ${bin} reminder add [<text> [time]]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--text|tx <text>]'
+  echo '    [--time|tm <time>] [--trace|-x] [--user|-ur <user>]'
+  echo
+  echo "  ${bin} reminder complete [reminder]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--reminder|rm <reminder>]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} reminder delete [reminder]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--reminder|rm <reminder>]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} reminder info [reminder]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--reminder|rm <reminder>]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} reminder list"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo "  ${bin} snooze end"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo "  ${bin} snooze info [user]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo '    [--user|-ur <user>]'
+  echo
+  echo "  ${bin} snooze start [minutes]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--minutes|-mn <minutes>] [--monochrome|-m]'
+  echo '    [--trace|-x]'
+  echo
+  echo "  ${bin} status clear"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo "  ${bin} status edit [<text> [<emoji>]]"
+  echo '    [--compact|-c] [--filter|-f <filter>] [--monochrome|-m] [--trace|-x]'
+  echo
+  echo 'Configuration Commands:'
+  echo '  init    Initialize'
+  echo
+  echo 'Chat Commands:'
+  echo '  chat delete    Delete chat message'
+  echo '  chat send      Send chat message'
+  echo '  chat update    Update chat message'
+  echo
+  echo 'File Commands:'
+  echo '  file delete    Delete file'
+  echo '  file info      Info about file'
+  echo '  file list      List files'
+  echo '  file upload    Upload file'
+  echo
+  echo 'Presence Commands:'
+  echo '  presence active    Active presence'
+  echo '  presence away      Away presence'
+  echo
+  echo 'Reminder Commands:'
+  echo '  reminder add         Add reminder'
+  echo '  reminder complete    Complete reminder'
+  echo '  reminder delete      Delete reminder'
+  echo '  reminder info        Info about reminder'
+  echo '  reminder list        List reminders'
+  echo
+  echo 'Snooze Commands:'
+  echo '  snooze end      End snooze'
+  echo '  snooze info     Info about snooze'
+  echo '  snooze start    Start snooze'
+  echo
+  echo 'Status Commands:'
+  echo '  status clear    Clear status'
+  echo '  status edit     Edit status'
+  echo
+  echo 'More Information:'
+  echo '  repo    https://github.com/rockymadden/slack-cli'
+}
+
+function filedelete() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/files.delete \
+      --data-urlencode "file=${file}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function fileinfo() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/files.info \
+      ${count:+ --data-urlencode "count=${count}"} \
+      --data-urlencode "file=${file}" \
+      ${page:+ --data-urlencode "page=${page}"} \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function filelist() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/files.list \
+      ${channel:+ --data-urlencode "channel=${channel}"} \
+      ${count:+ --data-urlencode "count=${count}"} \
+      ${page:+ --data-urlencode "page=${page}"} \
+      ${timestampfrom:+ --data-urlencode "ts_from=${timestampfrom}"} \
+      ${timestampto:+ --data-urlencode "ts_to=${timestampto}"} \
+      ${types:+ --data-urlencode "types=${types}"} \
+      ${user:+ --data-urlencode "user=$(luser)"} \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function fileupload() {
+  [ -n "${stdin}" ] && [ -z "${file}" ] && file=${stdin}
+
+  if [ -f "${file}" ]; then
+    local _file=${file}
+
+    case "${filename}" in
+      '') local _filename=$(basename ${file}) ;;
+      *) local _filename=${filename} ;;
+    esac
+  else
+    local _content=${file}
+
+    case "${filename}" in
+      '') local _filename='stdin' ;;
+      *) local _filename=${filename} ;;
+    esac
+  fi
+
+  case "${_file}" in
+    '')
+      local msg=$(\
+        curl -s -X POST https://slack.com/api/files.upload \
+          ${channels:+ --data-urlencode "channels=${channels}"} \
+          ${comment:+ --data-urlencode "initial_comment=${comment}"} \
+          ${_content:+ --data-urlencode "content=${_content}"} \
+          ${_filename:+ --data-urlencode "filename=${_filename}"} \
+          ${filetype:+ --data-urlencode "filetype=${filetype}"} \
+          ${title:+ --data-urlencode "title=${title}"} \
+          --data-urlencode "token=${token}")
+    ;;
+    *)
+      local msg=$(\
+        curl -s -X POST https://slack.com/api/files.upload \
+          ${channels:+ --form-string "channels=${channels}"} \
+          ${comment:+ --form "initial_comment=${comment}"} \
+          ${_file:+ --form "file=@${_file}"} \
+          ${_filename:+ --form "filename=${_filename}"} \
+          ${filetype:+ --form "filetype=${filetype}"} \
+          ${title:+ --form "title=${title}"} \
+          --form "token=${token}")
+    ;;
+  esac
+
+  jqify "${msg}"
+}
+
+function init() {
+  echo "${token}" > "${etcdir}/.slack"
+
+  case "${?}" in
+    0) echo '{"ok": true}' | jq -r ${compact} ${monochrome} "${filter:=.}" ;;
+    *)
+      echo '{"ok": false, "error": "not_writable"}' |
+        jq -r ${compact} ${monochrome} "${filter:=.}" ; return 1
+    ;;
+  esac
+}
+
+# Setting presence=auto + setActive works more consistently than just setActive.
+function presenceactive() {
+  local msg0=$(\
+    curl -s -X POST https://slack.com/api/users.setPresence \
+      --data-urlencode "presence=auto" \
+      --data-urlencode "token=${token}")
+
+  local msg1=$(\
+    curl -s -X POST https://slack.com/api/users.setActive \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg0}" && jqify "${msg1}" >/dev/null 2>&1
+}
+
+function presenceaway() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/users.setPresence \
+      --data-urlencode "presence=away" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function reminderadd() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/reminders.add \
+      --data-urlencode "text=${text}" \
+      --data-urlencode "time=${_time}" \
+      ${user:+ --data-urlencode "user=$(luser)"} \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function remindercomplete() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/reminders.complete \
+      --data-urlencode "reminder=${reminder}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function reminderdelete() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/reminders.delete \
+      --data-urlencode "reminder=${reminder}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function reminderinfo() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/reminders.info \
+      --data-urlencode "reminder=${reminder}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function reminderlist() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/reminders.list \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function snoozeend() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/dnd.endSnooze \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function snoozeinfo() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/dnd.info \
+      ${user:+ --data-urlencode "user=$(luser)"} \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function snoozestart() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/dnd.setSnooze \
+      --data-urlencode "num_minutes=${minutes}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function statusclear() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/users.profile.set \
+      --data-urlencode 'profile={"status_text":"", "status_emoji":""}' \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function statusedit() {
+  local msg=$(\
+    curl -s -X POST https://slack.com/api/users.profile.set \
+      --data-urlencode "profile={\"status_text\":\"${text}\", \"status_emoji\":\"${emoji}\"}" \
+      --data-urlencode "token=${token}")
+
+  jqify "${msg}"
+}
+
+function version() {
+  echo '0.18.0'
+}
+
+# COMMAND ROUTING #################################################################################
+case "${cmd}${sub}" in
+  --help|-h) help ; exit 0 ;;
+  --version|-v) version ; exit 0 ;;
+  init) init ; exit $? ;;
+  chatdelete|chatsend|chatupdate|\
+  filedelete|fileinfo|filelist|fileupload|\
+  presenceactive|presenceaway|\
+  reminderadd|remindercomplete|reminderdelete|reminderinfo|reminderlist|\
+  snoozeend|snoozeinfo|snoozestart|\
+  statusclear|statusedit)
+    if [ -z "${token}" ]; then
+      echo '{"ok": false, "error": "not_inited"}' |
+        jq -r ${compact} ${monochrome} "${filter:=.}" ; exit 1
+    fi
+
+    ${cmd}${sub} ; exit $?
+  ;;
+  *) help ; exit 1 ;;
+esac
