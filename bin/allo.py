@@ -5,8 +5,8 @@ import os
 from datetime import datetime
 
 time_str = datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
-log_dir = "/home/xc429/slurm/logs"
-file_dir =  "/home/xc429/slurm/files"
+log_dir = os.path.expanduser("~/slurm/logs")
+file_dir = os.path.expanduser("~/slurm/files")
 os.makedirs(log_dir, exist_ok=True)
 os.makedirs(file_dir, exist_ok=True)
 

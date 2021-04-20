@@ -1,3 +1,4 @@
+# cuda
 module() { eval `/usr/bin/modulecmd zsh $*`; }
 module use ~xc429/modulefiles
 
@@ -7,6 +8,10 @@ alias cuda9='module unload cuda cudnn && module load cuda/9.0 cudnn/v7.3-cuda-9.
 alias cuda8='module unload cuda cudnn && module load cuda/8.0 cudnn/v5.1-cuda-8.0'
 alias cuda102='module unload cuda cudnn && module load cuda/10.2 cudnn/v7.6-cuda-10.2'
 
+# g2
+alias g2top='python $HOME/bin/g2top.py --gpu-only'
+
+# graphite
 alias gtop='ls -Art /share/nikola/export/graphite_usage/ | tail -n 1 | xargs -I % sh -c "cat /share/nikola/export/graphite_usage/%" | grep "RUNNING\|PENDING" |sort -k 1,1'
 alias sq='python $HOME/bin/sq.py'
 alias allo='python $HOME/bin/allo.py'
