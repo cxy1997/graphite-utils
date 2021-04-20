@@ -2,9 +2,10 @@ import os
 from subprocess import Popen, PIPE
 from itertools import chain
 
-from g2top import parse_server, parse_gpu
+from g2top import parse_server, parse_gpu, parse_usage
 
 
+GTOP = "sacct --format=Jobid,State,AllocTRES%50 --units=G | grep RUNNING | grep billing"
 SINFO = 'sinfo -o %N\|%G -h -e'
 SQ = "squeue -l"
 jupyter_log = os.path.expanduser("~/slurm/logs/jupyter.txt")
@@ -36,7 +37,7 @@ def parse_sinfo(string):
     return res
 
 
-def parse_qinfo(string, job_dict, server_dict):
+def parse_qinfo(string, job_dict, server_dict, usage_dict):
     lines = string.rstrip().split("\n")
     lines = list(map(lambda x: list(filter(lambda y: len(y) > 0, x.split(" "))), lines))[2:]
     res = []
@@ -45,16 +46,28 @@ def parse_qinfo(string, job_dict, server_dict):
         x["job_id"] = line[0]
         x["partition"] = line[1]
         x["server"] = line[8]
-        x["port"] = job_dict.get(x["job_id"], "")
-        x["gpu"] = f"{server_dict[line[8]]['num']} x {server_dict[line[8]]['type']}" if line[8] in server_dict and server_dict[line[8]]['type'] != "null" else ""
+        x["port"] = job_dict.get(line[0], "")
+        x["gpu"] = f"{usage_dict[line[0]]} x {server_dict[line[8]]['type']}" if line[0] in usage_dict and line[8] in server_dict and server_dict[line[8]]['type'] != "null" else ""
         res.append(x)
+    return res
+
+
+def parse_gtop(string):
+    lines = string.rstrip().split("\n")
+    lines = list(map(lambda x: list(filter(lambda y: len(y) > 0, x.split(" "))), lines))
+    lines = list(filter(lambda x: len(x) > 0, lines))
+    res = dict()
+    for line in lines:
+        res[line[0]] = parse_usage(line[2])["gpu"]
     return res
 
 
 if __name__ == "__main__":
     server_dict = parse_sinfo(exec(SINFO))
     job_dict = read_logs()
-    jobs = parse_qinfo(exec(SQ), job_dict, server_dict)
+    usage_dict = parse_gtop(exec(GTOP))
+    print(usage_dict)
+    jobs = parse_qinfo(exec(SQ), job_dict, server_dict, usage_dict)
     if len(jobs) > 0:
         print(f"Job ID\tPartition\tServer\t\t\t{'GPU':15}Port")
         for x in jobs:
