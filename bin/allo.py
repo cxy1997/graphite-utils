@@ -14,11 +14,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--cpu', type=int, default=4)
 parser.add_argument('--gpu', type=int, default=1)
 parser.add_argument('--mem', type=int, default=64)
-parser.add_argument('--time', type=int, default=None)
+parser.add_argument('--time', type=int, default=14)
 parser.add_argument('--node', type=str, default=None)
 parser.add_argument('--p', type=str, default="default_gpu")
 args = parser.parse_args()
-port = random.randint(32133,53112)
+port = random.randint(32133, 53112)
 node="""#!/bin/bash
 #SBATCH --job-name=jjob
 #SBATCH -o {3}/{4}-job-%j.out                              # Name of stdout output file (%j expands to jobId)
@@ -30,8 +30,8 @@ node="""#!/bin/bash
 """.format(args.mem, args.cpu, args.gpu, log_dir, time_str, args.p)
 
 if args.time is not None:
-    args.time = args.time * 24
-    node += "#SBATCH -t {2}:00:00                                          # Run time (hh:mm:ss)\n"
+    args.time = args.time * 24 * 60
+    node += f"#SBATCH -t {args.time}                                          # Run time (hh:mm:ss)\n"
 if args.node is not None:
     node += "#SBATCH --nodelist={}\n".format(args.node)
 

@@ -66,7 +66,6 @@ if __name__ == "__main__":
     server_dict = parse_sinfo(exec(SINFO))
     job_dict = read_logs()
     usage_dict = parse_gtop(exec(GTOP))
-    print(usage_dict)
     jobs = parse_qinfo(exec(SQ), job_dict, server_dict, usage_dict)
     if len(jobs) > 0:
         print(f"Job ID\tPartition\tServer\t\t\t{'GPU':15}Port")
