@@ -16,7 +16,7 @@ parser.add_argument('--gpu', type=int, default=1)
 parser.add_argument('--mem', type=int, default=64)
 parser.add_argument('--time', type=int, default=14)
 parser.add_argument('--node', type=str, default=None)
-parser.add_argument('--p', type=str, default="default_gpu")
+parser.add_argument('--p', type=str, default="default_partition")
 args = parser.parse_args()
 port = random.randint(32133, 53112)
 node="""#!/bin/bash
@@ -39,7 +39,7 @@ node += """cd $HOME
 export XDG_RUNTIME_DIR=""
 #Pick a random or predefined port
 #Forward the picked port to the prince on the same port. Here log-x is set to be the prince login node.
-ssh -fCNR {0}:localhost:{0} -o ServerAliveInterval=60 gra
+ssh -fCNR {0}:localhost:{0} -o ServerAliveInterval=60 g2
 #Start the notebook
 jupyter notebook --no-browser --port {0}
 """.format(port)
@@ -52,4 +52,4 @@ r_id = os.popen('sbatch {}/{}'.format(file_dir, file_name)).read().strip().split
 print('file: {}/{}\tid: {}\tport: {}'.format(file_dir, file_name, r_id, port))
 with open(f'{log_dir}/jupyter.txt', 'a') as f:
     f.write('file: {}/{}\tid: {}\tport: {}\n'.format(file_dir, file_name, r_id, port))
-print('grapt {}'.format(port))
+print('g2pt {}'.format(port))
