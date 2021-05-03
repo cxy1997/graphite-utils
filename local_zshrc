@@ -1,3 +1,8 @@
-grapt () { ssh gra -fNL ${=1}:localhost:${=1}; open http://127.0.0.1:${=1}; }
+# link open command in linux
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    alias open='xdg-open'
+fi
+
+# grapt () { ssh gra -fNL ${=1}:localhost:${=1}; open http://127.0.0.1:${=1}; }
 g2pt () { ssh g2 -fNL ${=1}:localhost:${=1}; open http://127.0.0.1:${=1}; }
 cpt() { ps aux | grep "${=1}:localhost:${=1}" | grep ssh | awk '{print $14}' | cut -d':' -f 3 | xargs -I % sh -c "echo port % killed"; ps aux | grep "${=1}:localhost:${=1}" | grep ssh | awk '{print $2}' | xargs -I % sh -c "kill -9 %"; }
