@@ -19,11 +19,11 @@ By default, [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) is used.
 | `allo [--cpu $Ncpus] [--gpu $Ngpus] [--mem $Ngb] [--time $Ndays] [--node $nodename] [--p $partition]` | submit new job |
 | `sq` | display your jobs |
 | `wn` | monitor gpu status |
-| `kq` | show jobs on `kilian` quque |
+| `kq` | show running jobs in `kilian` queue |
 | `torchver` | display pytorch version |
 
 ### local side
 | Command | Function |
 | :---- | :---- |
 | `g2pt $portnumber` | connect to jupyter notebook via g2 |
-| `cpt [$portnumber]` | clear given port or all ports (by default)|
+| `cpt [$portnumber]` | clear given port (or all ports by default) |
