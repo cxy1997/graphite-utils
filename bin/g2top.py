@@ -190,14 +190,14 @@ def disp(server, info, disp_users):
     s = f"{server:24}"
     gpu_line = f"{info['gpu']['num']} x {info['gpu']['type']}"
     if disp_users:
-        s += " "*30
+        s += " "*35
     s += f"{gpu_line:15}"
     s += "\t".join(disp_resource(info, res) for res in RESOURCES)
     if disp_users:
         for jobid, job_info in info['users'].items():
             user_line = ""
             user_line += "\n" + " " * 24 + \
-                f"{job_info['netid']:>7}   {job_info['partition']:^17}   "
+                f"   {job_info['netid']:^9.9}   {job_info['partition']:^17.17}   "
             gpu_line = f"{job_info['gpu']} x {info['gpu']['type']}"
             user_line += f"{gpu_line:15}"
             user_line += "\t".join(disp_user_resource(job_info, res)
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 
     if args.disp_users:
         print(
-            f"{'Server':24}{'NetID':^10}{'Partition':^20}{'GPU':^15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
+            f"{'Server':24}   {'NetID':^9}   {'Partition':^17}   {'GPU':^15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
     else:
         print(f"{'Server':24}{'GPU':15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
     for server in sorted(list(usage.keys())):
