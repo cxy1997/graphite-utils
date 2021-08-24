@@ -3,17 +3,36 @@ import sys
 import argparse
 from subprocess import Popen, PIPE
 from itertools import chain
+from termcolor import colored
 
-
-GTOP = "sacct --format=User%10,partition%20,NodeList%25,State,AllocTRES%50 -a --units=G | grep RUNNING | grep billing"
-SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
+GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%50,Jobid -a --units=G | grep RUNNING | grep billing"
+# SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
+SINFO = 'sinfo -O nodehost:50,gres,cpusstate,allocmem,memory -h -e'
 RESOURCES = ["cpu", "gpu", "mem"]
 PARTITIONS = ["priority", "default"]
-
 
 def exec(cmd):
     return Popen(cmd, shell=True, stdout=PIPE).stdout.read().decode("utf-8")
 
+priority_nodes = {
+    'kilian': set([
+        "nikola-compute-01",
+        "nikola-compute-02",
+        "nikola-compute-03",
+        "nikola-compute-04",
+        "nikola-compute-05",
+        "nikola-compute-11",
+        "nikola-compute-12",
+        "nikola-compute-13",
+        "harpo",
+        "tripods-compute-01",
+        "tripods-compute-02"
+    ]),
+}
+
+
+def is_priority(name):
+    return not (("default" in name) or ("gpu" in name))
 
 def _get_suffix(string):
     if "-" in string:
@@ -72,8 +91,8 @@ def parse_cpu(string):
 
 
 def parse_mem(string):
-    i, t = list(map(lambda x: int(x) if x.isdigit() else 0, string))
-    return {"idle": i, "total": t}
+    a, t = list(map(lambda x: int(x) if x.isdigit() else 0, string))
+    return {"idle": t-a, "total": t}
 
 
 def init_usage():
@@ -81,7 +100,7 @@ def init_usage():
 
 
 def parse_sinfo(string, args):
-    lines = map(lambda x: x.split("|"), string.rstrip().split("\n"))
+    lines = map(lambda x: x.split(), string.rstrip().split("\n"))
     res = dict()
     for line in lines:
         servers = parse_server(line[0])
@@ -95,7 +114,8 @@ def parse_sinfo(string, args):
                 "gpu": gpu,
                 "cpu": cpu,
                 "mem": mem,
-                "usage": init_usage()
+                "usage": init_usage(),
+                "users": {}
             }
     return res
 
@@ -114,13 +134,19 @@ def parse_gtop(string, servers):
     lines = list(map(lambda x: list(filter(lambda y: len(y) > 0, x.split(" "))), lines))
     lines = list(filter(lambda x: len(x) > 0, lines))
     for line in lines:
-        partition = "default" if "default" in line[1] else "priority"
+        partition = "default" if not is_priority(line[1]) else "priority"
         _servers = parse_server(line[2])
         info = parse_usage(line[4])
         for server in _servers:
             if server in servers:
+                servers[server]["users"][line[5]] = {}
+                servers[server]["users"][line[5]]['partition'] = line[1]
+                servers[server]["users"][line[5]]['netid'] = line[0]
                 for r in RESOURCES:
-                    servers[server]["usage"][r][partition] += info[r]
+                    servers[server]["usage"][r][partition] += \
+                        info[r] // len(_servers)
+                    servers[server]["users"][line[5]][r] = \
+                        info[r] // len(_servers)
     return servers
 
 
@@ -137,23 +163,71 @@ def disp_resource(info, res):
         return " / ".join([f"{x:5.1f}" for x in s])
 
 
+def disp_user_resource(job_info, res):
+    if res == "cpu":
+        s = f"{job_info[res]:2d}"
+        if not is_priority(job_info['partition']):
+            s = " "*2 + " "*3 + s + " "*3 + " "*2
+        else:
+            s = s + " "*3 + " "*2 + " "*3 + " "*2
+    elif res == "gpu":
+        s = f"{job_info[res]}"
+        if not is_priority(job_info['partition']):
+            s = " " + " "*3 + s + " "*3 + " "
+        else:
+            s = s + " "*3 + " " + " "*3 + " "
+    elif res == "mem":
+        s = f"{job_info[res]:5.1f}"
+        if not is_priority(job_info['partition']):
+            s = " "*5 + " "*3 + s + " "*3 + " "*5
+        else:
+            s = s + " "*3 + " "*5 + " "*3 + " "*5
 
-def disp(server, info):
-    s = f"{server:24}"
-    s += f"{info['gpu']['num']} x {info['gpu']['type']}\t"
-    s += "\t".join(disp_resource(info, res) for res in RESOURCES)
     return s
 
 
+def disp(server, info, disp_users):
+    s = f"{server:24}"
+    gpu_line = f"{info['gpu']['num']} x {info['gpu']['type']}"
+    if disp_users:
+        s += " "*35
+    s += f"{gpu_line:15}"
+    s += "\t".join(disp_resource(info, res) for res in RESOURCES)
+    if disp_users:
+        for jobid, job_info in info['users'].items():
+            user_line = ""
+            user_line += "\n" + " " * 24 + \
+                f"   {job_info['netid']:^9.9}   {job_info['partition']:^17.17}   "
+            gpu_line = f"{job_info['gpu']} x {info['gpu']['type']}"
+            user_line += f"{gpu_line:15}"
+            user_line += "\t".join(disp_user_resource(job_info, res)
+                           for res in RESOURCES)
+            if not is_priority(job_info['partition']):
+                s += colored(user_line, 'green')
+            else:
+                s += colored(user_line, 'red')
+    # s += "\n"
+    return s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu-only', action="store_true")
+    parser.add_argument('--disp-users', action="store_true")
+    parser.add_argument('--show-only', type=str, default=None)
     args = parser.parse_args()
 
     servers = parse_sinfo(exec(SINFO), args)
+    if args.show_only is not None:
+        for k in list(servers.keys()):
+            if k not in priority_nodes[args.show_only]:
+                del servers[k]
     usage = parse_gtop(exec(GTOP), servers)
 
-    print(f"{'Server':24}GPU\t\tCPU Usage\tGPU Usage\tMemory Usage (GB)\t\t(priority / default / idle)")
-    for server in usage.keys():
-        print(disp(server, usage[server]))
+    if args.disp_users:
+        print(
+            f"{'Server':24}   {'NetID':^9}   {'Partition':^17}   {'GPU':^15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
+    else:
+        print(f"{'Server':24}{'GPU':15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
+    for server in sorted(list(usage.keys())):
+        print(disp(server, usage[server], args.disp_users))
+
