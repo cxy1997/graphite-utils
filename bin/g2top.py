@@ -126,6 +126,8 @@ def parse_usage(string):
         if r in string:
             l = string.find(r)
             res[r] = eval(string[l+4:l+string[l:].find(",")].rstrip("G"))
+        else:
+            res[r] = 0
     return res
 
 

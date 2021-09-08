@@ -1,8 +1,14 @@
 import os
+import argparse
 from subprocess import Popen, PIPE
 from itertools import chain
 
 from g2top import parse_server, parse_gpu, parse_usage
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--verbose', '-v', action="store_true")
+args = parser.parse_args()
 
 
 GTOP = "sacct -X --format=Jobid,State,AllocTRES%50 --units=G | grep RUNNING | grep billing"
@@ -13,7 +19,7 @@ jupyter_log = os.path.expanduser("~/slurm/logs/jupyter.txt")
 
 def read_logs():
     res = dict()
-    if os.path.exists(jupyter_log):
+    if os.path.isfile(jupyter_log):
         with open(jupyter_log) as f:
             lines = list(map(lambda x: x.split("\t"), f.readlines()))
         for line in lines:
@@ -49,8 +55,9 @@ def parse_qinfo(string, job_dict, server_dict, usage_dict):
         x["server"] = line[8]
         x["port"] = job_dict.get(line[0], "")
         x["gpu"] = f"{usage_dict[line[0]]['gpu']} x {server_dict[line[8]]['type']}" if line[0] in usage_dict and line[8] in server_dict and server_dict[line[8]]['type'] != "null" else ""
-        x["mem"] = f"{usage_dict[line[0]]['mem']}G"
-        x["cpu"] = f"{usage_dict[line[0]]['cpu']}"
+        if args.verbose:
+            x["cpu"] = str(usage_dict[line[0]]['cpu'])
+            x["mem"] = f"{usage_dict[line[0]]['mem']}G"
         res.append(x)
     return res
 
@@ -71,6 +78,12 @@ if __name__ == "__main__":
     usage_dict = parse_gtop(exec(GTOP))
     jobs = parse_qinfo(exec(SQ), job_dict, server_dict, usage_dict)
     if len(jobs) > 0:
-        print(f"{'Job ID':^8}{'Partition':^14}{'Server':^20}{'Port':^8}{'GPU':^15}{'CPU':5}{'RAM':5}")
-        for x in jobs:
-            print(f'{x["job_id"]:^8}{x["partition"]:^14}{x["server"]:20}{x["port"]:8}{x["gpu"]:^15}{x["cpu"]:5}{x["mem"]:5}')
+        if args.verbose:
+            print(f"Job ID\tPartition\tServer\t\t\t{'CPU':6}{'Memory':9}{'GPU':15}Port")
+            for x in jobs:
+                print(
+                    f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["cpu"]:6}{x["mem"]:9}{x["gpu"]:15}{x["port"]}')
+        else:
+            print(f"Job ID\tPartition\tServer\t\t\t{'GPU':15}Port")
+            for x in jobs:
+                print(f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["gpu"]:15}{x["port"]}')
