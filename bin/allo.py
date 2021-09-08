@@ -39,11 +39,8 @@ node += """cd $HOME
 export XDG_RUNTIME_DIR=""
 #Pick a random or predefined port
 #Forward the picked port to the prince on the same port. Here log-x is set to be the prince login node.
-/home/yy785/.linuxbrew/bin/autossh -M 0 -o "StrictHostKeyChecking=no" -o "ServerAliveInterval 60" -o "ServerAliveCountMax 3" -NfR {0}:0.0.0.0:{0} g2-login.coecis.cornell.edu
+ssh -fCNR {0}:localhost:{0} -o ServerAliveInterval=60 g2
 #Start the notebook
-. /home/yy785/anaconda3/etc/profile.d/conda.sh
-conda activate base
-export SHELL=/bin/zsh
 jupyter notebook --no-browser --port {0}
 """.format(port)
 
