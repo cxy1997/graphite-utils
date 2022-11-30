@@ -1,5 +1,5 @@
 Host g2
-    HostName g2-login.coecis.cornell.edu
+    HostName g2-login-02.coecis.cornell.edu
     User #netid
 Host gra
     HostName graphite-login-01.coecis.cornell.edu

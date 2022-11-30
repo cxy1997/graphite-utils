@@ -2,7 +2,7 @@
 
 ## Installation
 By default, [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) is used.
-1. Add [ssh congurations](./ssh_config) to local `~/.ssh/config`
+1. Add [ssh congurations](./ssh_config) to local and `g2`'s `~/.ssh/config`
 2. Add [port forwarding functions](./local_zshrc) to local `~/.zshrc`
 3. Add [zsh scripts](./zshrc) to `g2`'s `~/.zshrc`
 4.  Copy folders to `g2`
