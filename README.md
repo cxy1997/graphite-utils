@@ -17,7 +17,7 @@ By default, [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) is used.
 | `cuda*` | switch cuda version |
 | `g2top` | display gpu/cpu/mem availability |
 | `allo [--cpu $Ncpus] [--gpu $Ngpus] [--mem $Ngb] [--time $Ndays] [--node $nodename] [--p $partition]` | submit new job |
-| `sq` | display your jobs |
+| `sq [-v]` | display your jobs |
 | `wn` | monitor gpu status |
 | `kq` | show running jobs in `kilian` queue |
 | `torchver` | display pytorch version |

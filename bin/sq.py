@@ -11,7 +11,7 @@ parser.add_argument('--verbose', '-v', action="store_true")
 args = parser.parse_args()
 
 
-GTOP = "sacct -X --format=Jobid,State,AllocTRES%50 --units=G | grep RUNNING | grep billing"
+GTOP = "sacct -X --format=Jobid,State,AllocTRES%50,ElapsedRaw,TimelimitRaw --units=G | grep RUNNING | grep billing"
 SINFO = 'sinfo -o %N\|%G -h -e'
 SQ = "squeue -l"
 jupyter_log = os.path.expanduser("~/slurm/logs/jupyter.txt")
@@ -55,6 +55,7 @@ def parse_qinfo(string, job_dict, server_dict, usage_dict):
         x["server"] = line[8]
         x["port"] = job_dict.get(line[0], "")
         x["gpu"] = f"{usage_dict[line[0]]['gpu']} x {server_dict[line[8]]['type']}" if line[0] in usage_dict and line[8] in server_dict and server_dict[line[8]]['type'] != "null" else ""
+        x["time_left"] = usage_dict[line[0]]["time_left"]
         if args.verbose:
             x["cpu"] = str(usage_dict[line[0]]['cpu'])
             x["mem"] = f"{usage_dict[line[0]]['mem']}G"
@@ -69,6 +70,8 @@ def parse_gtop(string):
     res = dict()
     for line in lines:
         res[line[0]] = parse_usage(line[2])
+        time_left = int(line[4]) * 60 - int(line[3])
+        res[line[0]]["time_left"] = f"{time_left // 86400:>2d}d {time_left % 86400 // 3600:>2d}h {time_left % 3600 // 60:>2d}m {time_left % 60:>2d}s"
     return res
 
 
@@ -79,11 +82,11 @@ if __name__ == "__main__":
     jobs = parse_qinfo(exec(SQ), job_dict, server_dict, usage_dict)
     if len(jobs) > 0:
         if args.verbose:
-            print(f"Job ID\tPartition\tServer\t\t\t{'CPU':6}{'Memory':9}{'GPU':15}Port")
+            print(f"Job ID\tPartition\tServer\t\t\t{'CPU':6}{'Memory':9}{'GPU':15}{'Port':8}{'Time Left':17}")
             for x in jobs:
                 print(
-                    f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["cpu"]:6}{x["mem"]:9}{x["gpu"]:15}{x["port"]}')
+                    f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["cpu"]:6}{x["mem"]:9}{x["gpu"]:15}{x["port"]:8}{x["time_left"]:17}')
         else:
-            print(f"Job ID\tPartition\tServer\t\t\t{'GPU':15}Port")
+            print(f"Job ID\tPartition\tServer\t\t\t{'GPU':15}{'Port':8}{'Time Left':17}")
             for x in jobs:
-                print(f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["gpu"]:15}{x["port"]}')
+                print(f'{x["job_id"]}\t{x["partition"]:14s}\t{x["server"]:16s}\t{x["gpu"]:15}{x["port"]:8}{x["time_left"]:17}')
