@@ -55,7 +55,7 @@ def parse_qinfo(string, job_dict, server_dict, usage_dict):
         x["server"] = line[8]
         x["port"] = job_dict.get(line[0], "")
         x["gpu"] = f"{usage_dict[line[0]]['gpu']} x {server_dict[line[8]]['type']}" if line[0] in usage_dict and line[8] in server_dict and server_dict[line[8]]['type'] != "null" else ""
-        x["time_left"] = usage_dict[line[0]]["time_left"]
+        x["time_left"] = usage_dict[line[0]]["time_left"] if line[0] in usage_dict else ""
         if args.verbose:
             x["cpu"] = str(usage_dict[line[0]]['cpu'])
             x["mem"] = f"{usage_dict[line[0]]['mem']}G"
