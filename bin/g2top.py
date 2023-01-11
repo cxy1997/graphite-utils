@@ -24,6 +24,10 @@ priority_nodes = {
         "nikola-compute-11",
         "nikola-compute-12",
         "nikola-compute-13",
+        "nikola-compute-14",
+        "nikola-compute-15",
+        "nikola-compute-16",
+        "nikola-compute-17",
         "harpo",
         "tripods-compute-01",
         "tripods-compute-02"
@@ -82,8 +86,13 @@ def parse_gpu(string):
     if "null" in string:
         return {"type": "null", "num": 0}
     else:
-        _, gtype, gnum = string.split(":")
-        return {"type": gtype, "num": int(gnum)}
+        slices = string.split(":")
+        gtype, gnum = slices[1:3]
+        end_idx = 0
+        while end_idx < len(gnum) and gnum[end_idx].isdigit():
+            end_idx += 1
+        gnum = int(gnum[:end_idx])
+        return {"type": gtype, "num": gnum}
 
 
 def parse_cpu(string):
