@@ -7,7 +7,7 @@ from termcolor import colored
 
 GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%50,Jobid -a --units=G | grep RUNNING | grep billing"
 # SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
-SINFO = 'sinfo -O nodehost:50,gres,cpusstate,allocmem,memory -h -e'
+SINFO = 'sinfo -O nodehost:50,gres:50,cpusstate,allocmem,memory -h -e'
 RESOURCES = ["cpu", "gpu", "mem"]
 PARTITIONS = ["priority", "default"]
 
@@ -86,13 +86,17 @@ def parse_gpu(string):
     if "null" in string:
         return {"type": "null", "num": 0}
     else:
-        slices = string.split(":")
-        gtype, gnum = slices[1:3]
-        end_idx = 0
-        while end_idx < len(gnum) and gnum[end_idx].isdigit():
-            end_idx += 1
-        gnum = int(gnum[:end_idx])
-        return {"type": gtype, "num": gnum}
+        gtype = []
+        gnum_total = 0
+        for sub in string.split(","):
+            slices = sub.split(":")
+            gtype.append(slices[1])
+            gnum = slices[2]
+            end_idx = 0
+            while end_idx < len(gnum) and gnum[end_idx].isdigit():
+                end_idx += 1
+            gnum_total += int(gnum[:end_idx])
+        return {"type": f'({"|".join(gtype)})' if len(gtype) > 1 else gtype[0], "num": gnum_total}
 
 
 def parse_cpu(string):
@@ -198,19 +202,19 @@ def disp_user_resource(job_info, res):
 
 
 def disp(server, info, disp_users):
-    s = f"{server:24}"
+    s = f"{server:25}"
     gpu_line = f"{info['gpu']['num']} x {info['gpu']['type']}"
     if disp_users:
         s += " "*35
-    s += f"{gpu_line:15}"
+    s += f"{gpu_line:19}"
     s += "\t".join(disp_resource(info, res) for res in RESOURCES)
     if disp_users:
         for jobid, job_info in info['users'].items():
             user_line = ""
-            user_line += "\n" + " " * 24 + \
+            user_line += "\n" + " " * 25 + \
                 f"   {job_info['netid']:^9.9}   {job_info['partition']:^17.17}   "
             gpu_line = f"{job_info['gpu']} x {info['gpu']['type']}"
-            user_line += f"{gpu_line:15}"
+            user_line += f"{gpu_line:19}"
             user_line += "\t".join(disp_user_resource(job_info, res)
                            for res in RESOURCES)
             if not is_priority(job_info['partition']):
@@ -236,9 +240,9 @@ if __name__ == "__main__":
 
     if args.disp_users:
         print(
-            f"{'Server':24}   {'NetID':^9}   {'Partition':^17}   {'GPU':^15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
+            f"{'Server':25}   {'NetID':^9}   {'Partition':^17}   {'GPU':^19}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
     else:
-        print(f"{'Server':24}{'GPU':15}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
+        print(f"{'Server':25}{'GPU':19}{'CPU Usage':^12}\t{'GPU Usage':9}\tMemory Usage (GB) (P/D/I)")
     for server in sorted(list(usage.keys())):
         print(disp(server, usage[server], args.disp_users))
 
