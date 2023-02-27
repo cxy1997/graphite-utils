@@ -10,6 +10,7 @@ alias cuda101='module unload cuda cudnn && module load cuda/10.1 cudnn/v7.6-cuda
 alias cuda102='module unload cuda cudnn && module load cuda/10.2 cudnn/v7.6-cuda-10.2'
 alias cuda11='module unload cuda cudnn && module load cuda/11.0 cudnn/v8.0-cuda-11.0'
 alias cuda113='module unload cuda cudnn && module load cuda/11.3 cudnn/v8.2-cuda-11.3'
+alias cuda117='module unload cuda cudnn && module load cuda/11.7 cudnn/v8.5-cuda-11.7'
 
 # g2
 alias g2top='python $HOME/bin/g2top.py --gpu-only'
