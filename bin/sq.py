@@ -11,7 +11,7 @@ parser.add_argument('--verbose', '-v', action="store_true")
 args = parser.parse_args()
 
 
-GTOP = "sacct -X --format=Jobid,State,AllocTRES%50,ElapsedRaw,TimelimitRaw --units=G | grep RUNNING | grep billing"
+GTOP = "sacct -X --format=Jobid,State,AllocTRES%80,ElapsedRaw,TimelimitRaw --units=G | grep RUNNING | grep billing"
 SINFO = 'sinfo -o %N\|%G -h -e'
 SQ = "squeue -l"
 jupyter_log = os.path.expanduser("~/slurm/logs/jupyter.txt")

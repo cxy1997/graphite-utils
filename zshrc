@@ -9,6 +9,7 @@ alias cuda10='module unload cuda cudnn && module load cuda/10.0 cudnn/v7.3-cuda-
 alias cuda101='module unload cuda cudnn && module load cuda/10.1 cudnn/v7.6-cuda-10.1'
 alias cuda102='module unload cuda cudnn && module load cuda/10.2 cudnn/v7.6-cuda-10.2'
 alias cuda11='module unload cuda cudnn && module load cuda/11.0 cudnn/v8.0-cuda-11.0'
+alias cuda111='module unload cuda cudnn && module load cuda/11.1 cudnn/v8.0-cuda-11.1'
 alias cuda113='module unload cuda cudnn && module load cuda/11.3 cudnn/v8.2-cuda-11.3'
 alias cuda117='module unload cuda cudnn && module load cuda/11.7 cudnn/v8.5-cuda-11.7'
 
