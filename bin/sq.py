@@ -12,7 +12,7 @@ args = parser.parse_args()
 
 
 GTOP = "sacct -X --format=Jobid,State,AllocTRES%80,ElapsedRaw,TimelimitRaw --units=G | grep RUNNING | grep billing"
-SINFO = 'sinfo -o %N\|%G -h -e'
+SINFO = 'sinfo -o %N\|%G -h -e -a'
 SQ = "squeue -l"
 jupyter_log = os.path.expanduser("~/slurm/logs/jupyter.txt")
 

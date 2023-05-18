@@ -7,7 +7,7 @@ from termcolor import colored
 
 GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%80,Jobid -a --units=G | grep RUNNING | grep billing"
 # SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
-SINFO = 'sinfo -O nodehost:50,gres:50,cpusstate,allocmem,memory -h -e'
+SINFO = 'sinfo -O nodehost:50,gres:50,cpusstate,allocmem,memory -h -e -a'
 RESOURCES = ["cpu", "gpu", "mem"]
 PARTITIONS = ["priority", "default"]
 
