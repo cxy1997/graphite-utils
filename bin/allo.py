@@ -17,7 +17,7 @@ parser.add_argument('--mem', type=int, default=64)
 parser.add_argument('--time', type=int, default=14)
 parser.add_argument('--node', type=str, default=None)
 parser.add_argument('--p', type=str, default="default_partition")
-parser.add_argument('--email', type=str, default=None, help="Email address to send notification of job state changes.")
+parser.add_argument('--email', action="store_true", help="whether to send email notification of job state changes.")
 args = parser.parse_args()
 port = random.randint(32133, 53112)
 node="""#!/bin/bash
@@ -35,9 +35,9 @@ if args.time is not None:
     node += f"#SBATCH -t {args.time}                                          # Run time (hh:mm:ss)\n"
 if args.node is not None:
     node += "#SBATCH --nodelist={}\n".format(args.node)
-if args.email is not None:
+if args.email:
     node += "#SBATCH --mail-type=ALL\n"
-    node += f"#SBATCH --mail-user={args.email}\n"
+    node += f"#SBATCH --mail-user={os.getlogin()}@cornell.edu\n"
 
 node += """cd $HOME
 export XDG_RUNTIME_DIR=""
