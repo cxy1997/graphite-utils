@@ -3,13 +3,20 @@ import sys
 import argparse
 from subprocess import Popen, PIPE
 from itertools import chain
-from termcolor import colored
 
 GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%80,Jobid -a --units=G | grep RUNNING | grep billing"
 # SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
 SINFO = 'sinfo -O nodehost:50,gres:50,cpusstate,allocmem,memory -h -e -a'
 RESOURCES = ["cpu", "gpu", "mem"]
 PARTITIONS = ["priority", "default"]
+
+def colored(s, color):
+    if color == "red":
+        return "\033[1;31m" + s + "\033[0m"
+    elif color == "green":
+        return "\033[1;32m" + s + "\033[0m"
+    else:
+        raise NotImplementedError
 
 def exec(cmd):
     return Popen(cmd, shell=True, stdout=PIPE).stdout.read().decode("utf-8")
