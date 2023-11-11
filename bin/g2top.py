@@ -4,7 +4,7 @@ import argparse
 from subprocess import Popen, PIPE
 from itertools import chain
 
-GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%80,Jobid -a --units=G | grep RUNNING | grep billing"
+GTOP = "sacct -X --format=User%10,partition%20,NodeList%25,State,AllocTRES%200,Jobid -a --units=G | grep RUNNING | grep billing"
 # SINFO = 'sinfo -o %N\|%G\|%C\|%e\|%m -h -e'
 SINFO = 'sinfo -O nodehost:50,gres:50,cpusstate,allocmem,memory -h -e -a'
 RESOURCES = ["cpu", "gpu", "mem"]
@@ -140,15 +140,16 @@ def parse_sinfo(string, args):
     return res
 
 
-def parse_usage(string):
-    res = {k: 0 for k in RESOURCES}
-    for r in RESOURCES:
-        if r in string:
-            l = string.find(f"{r}=")
-            res[r] = eval(string[l+4:l+string[l:].find(",")].rstrip("G"))
-        else:
-            res[r] = 0
-    return res
+def parse_usage(string: str):
+    res_dict = {res: 0 for res in RESOURCES}
+    res_list = string.split(",")
+    for res in RESOURCES:
+        res_name = "gres/gpu" if res == "gpu" else res
+        for substring in res_list:
+            l, r = substring.split("=")
+            if res_name == l:
+                res_dict[res] += eval(r.rstrip("G"))
+    return res_dict
 
 
 def parse_gtop(string, servers):
