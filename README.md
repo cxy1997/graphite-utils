@@ -1,4 +1,5 @@
-# Graphite Utils
+# Graphite Utils 
+[[Official Guidance]](https://it.coecis.cornell.edu/researchit/g2cluster)
 
 ## Installation
 By default, [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) is used.
